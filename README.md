@@ -28,7 +28,8 @@ _C++_
 
 _Open MPI:_
 ```
-$ sudo apt-get install libopenmpi-dev openmpi-bin
+$ sudo apt-get install libopenmpi-dev openmpi-bin (Ubuntu)
+$ sudo yum  install openmpi openmpi-devel         (Centos 06)
 ```
 _Boost:_
 
