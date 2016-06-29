@@ -36,7 +36,7 @@ See [tutorial](http://www.boost.org/doc/libs/1_43_0/more/getting_started/unix-va
 ```
 $ tar --bzip2 -xf /path/to/boost_1_43_0.tar.bz2  
 $ cd boost_1_43_0  
-$ ./bootsrap.sh  
+$ ./bootstrap.sh 
 $ ./b2  
 $ ./bjam install
 ```
