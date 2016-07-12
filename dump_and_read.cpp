@@ -15,6 +15,7 @@ namespace po = boost::program_options;
 #include <cmath>
 #include <vector>
 #include <iterator>
+#include <numeric>
 
 using namespace std;
 int main ( int argc, char *argv[] );
@@ -76,7 +77,7 @@ int main ( int argc, char *argv[] ){
 			if(id == 0){
             			cout << "\nUsage: mpirun -np <n_process> ./a.out [--size ARG]* [--seconds ARG] [--iterations ARG]\n";
 				cout << "   ...or...\n";
-				cout << "       mpirun -np <n_process> ./a.out n_mb* n_seconds n_iterations";
+				cout << "       mpirun -np <n_process> ./a.out n_mb* n_seconds n_iterations\n";
 	    			cout << "* Required Argument\n\n";
             			cout << desc << "\n";
 			}
@@ -104,23 +105,18 @@ int main ( int argc, char *argv[] ){
 			byte = mb * 1000000;
 			size_byte = (int)std::ceil(byte);
 		
-			if(id == 0){
-                                std::cout << "MB = "<< mb <<" --> bytes = "<< byte <<" --> size_array = "<< size_byte;
-                                std::cout << " - seconds = "<< sec << " - iterations = " << its << std::endl;
-                        }
-
 			int i;
-			std::vector<double> vector_start(its*p);
-			std::vector<double> vector_delta(its*p);
+			
+			//for each process, create a vector (size = tot iterations) that it will contain delta write times of each iteration.
+			std::vector<double> delta_writeXprocess(its);
+
 			for(i = 0; i < its; i++){
-			  //    if ( id == 0 ) {
-				//	wtime = MPI_Wtime ( );
-				//	cout << "wtime = "<< wtime <<" sec.\n";
-			//	}
-				
+				if(id == 0){
+					cout << "\n";				
+				}
+			
 			//	ifstream infile;
 			//	infile.open("/dev/zero" ,ios::binary|ios::in);
-
 			//	outfile.open(name_output_file, ios::binary|ios::out);
 
 				/* when execution leaves this scope,
@@ -129,20 +125,17 @@ int main ( int argc, char *argv[] ){
 					//char* buffer;
 					//buffer = new char[size_byte];
 					std::vector<char> buffer(size_byte);
-								
+					double start_writeXprocess = 0.;
 					//infile.read(buffer,byte);
-					cout << "Iteration = "<< i <<" - Process " << id << ": barrier!\n";
-				
+
+//					cout << "Iteration = "<< i <<" - Process " << id << ": barrier!\n";
 					//synchronization: no process can pass the barrier until all of them call the function.
 					MPI_Barrier(MPI_COMM_WORLD);
-					cout << "Iteration = "<< i <<" - Process " << id << ".... ...\n";
 					
 					std::ofstream outfile;
 					std::string name_output_file = "outFile_it" + std::to_string(i) + "_p" + std::to_string(id)+".txt";
 					
-					vector_start[id*its+i] = MPI_Wtime ( );
-					cout << "start stored in  " << id*its+i << "\n";
-
+					start_writeXprocess = MPI_Wtime ( );
 					outfile.open(name_output_file, ios::binary|ios::out);
 					
 				//	outfile.write(buffer,byte);
@@ -150,20 +143,42 @@ int main ( int argc, char *argv[] ){
 
 					//infile.close();
 					outfile.close();
-					cout << "process: " << id << ", it: " << i << ", delta_write = "<<MPI_Wtime ( ) - vector_start[id*its+i] <<" sec\n";
-
+					
+					delta_writeXprocess[i] = MPI_Wtime ( ) - start_writeXprocess;
+					cout << "I wrote " << mb << " MB to file " << name_output_file << " in "<< delta_writeXprocess[i] <<" seconds.\n";
 					//delete[] buffer;
 				}
-			  //    if ( id == 0 ){
-					//wtime = MPI_Wtime ( ) - wtime;
-			//		cout << "Elapsed wall clock time = " << MPI_Wtime ( ) - wtime << " seconds.\n";
-			//	}
-			
 				wait (sec);
-			} 
-			//  Terminate MPI.
-			MPI_Finalize ( );
+			}
+
+			std::vector<double> delta_write;
+			if(id == 0){
+				//create the main vectors that contain all delta times of all processes.
+				delta_write.assign(its*p, 0.);
+			}
+			int disposition[p];
+			int count[p];
+			for(int k=0;k<p;k++){
+				disposition[k] = k*its;
+				count[k] = its;
+				if(id == 0){cout<<"disposition["<<k<<"] = "<<disposition[k]<<" -- count["<<k<<"] = "<<count[k]<<"\n";}
+			}	
+			MPI_Gatherv(&delta_writeXprocess.front(), its, MPI_DOUBLE, &delta_write.front(), count, disposition, MPI_DOUBLE, 0,MPI_COMM_WORLD);
+			cout<<"passo...\n";
+			if(id == 0){
+				double average_write = std::accumulate(delta_write.begin(), delta_write.end(), 0.0)/delta_write.size();
+				cout << "average_write (by function) = "<<average_write<<"\n";
+			
+			//	double tot = 0.;
+				for(int j=0; j<delta_write.size();j++){
+					cout << "delta_write["<<j<<"] = "<<delta_write[j] <<"\n";
+			//		tot = tot + delta_write[j];
+				}
+			//	cout << ".. tot = "<< tot << " - av = " << tot/delta_write.size() << "\n\n";
+			}
 		}
 	}
+	//  Terminate MPI
+	MPI_Finalize ( );
 	return 0;
 }
