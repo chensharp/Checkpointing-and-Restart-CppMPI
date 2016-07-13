@@ -9,11 +9,11 @@ $ mpic++ dump_and_read.cpp -o a.out -std=c++11 -lboost_program_options
 *****
 ## To Run ##
 ```         
-$ mpirun -np <n_process> ./a.out [--size ARG] [--seconds ARG] [--iterations ARG] (--help)
+$ mpirun -np <n_process> ./a.out [--size ARG] [--seconds ARG] [--iterations ARG] [--readFromFile ARG](--help)
 ```
 Or..
 ```         
-$ mpirun -np <n_process> ./a.out n_mb n_seconds n_iterations
+$ mpirun -np <n_process> ./a.out n_mb n_seconds n_iterations readFromFile
 ```
 Where:
 
@@ -21,6 +21,7 @@ Where:
 * *size arg* : size to be copied (MB) **REQUIRED!**
 * *seconds arg* (=60) : seconds to wait between two iterations
 * *iterations arg* (=1) : iterations of process
+* *readFromFile arg* (=0) : enable to read from files (on/off, true/false, 1/0)
 * *help*: produce help message
 *****
 ## Work Environment ##
