@@ -131,9 +131,6 @@ int main ( int argc, char *argv[] ){
 			}
 
 			for(i = 0; i < its; i++){
-				if(id == 0){
-					cout << "\n";				
-				}
 			
 				/* when execution leaves this scope,
 				   it is guaranteed that vector object will be destructed and memory will be freed.*/
@@ -144,11 +141,13 @@ int main ( int argc, char *argv[] ){
 						double start_read = 0.;
 
 						std::string inputFile = "outFile_it" + std::to_string(i-1) + "_p" + std::to_string(id)+".txt";
+
 						start_read = MPI_Wtime ( );
 						ifstream infile(inputFile, std::ios::binary);
 						buffer.assign((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
 						delta_rp[i] = MPI_Wtime ( ) - start_read;
-						cout << "I read " << mb << " MB from file " << inputFile << " in "<< delta_rp[i] <<" seconds.\n";
+
+						cout <<"I read "<< mb <<" MB from file "<< inputFile <<" in "<< delta_rp[i] <<" seconds.\n";
 					}
 
 					//synchronization: no process can pass the barrier until all of them call the function.
@@ -174,7 +173,14 @@ int main ( int argc, char *argv[] ){
 					delta_wp[i] = MPI_Wtime ( ) - start_write;
 					cout << "I wrote " << mb << " MB to file " << outputFile << " in "<< delta_wp[i] <<" seconds.\n";
 				}
+				MPI_Barrier(MPI_COMM_WORLD);
+				if(id == 0){
+					cout << "Now I'm going to sleep for "<< sec << " seconds...Zzz...\n\n";
+				}
 				wait (sec);
+				if(id == 0){
+                                        cout << "Hey! I woke up! :-)\n";
+                                }
 			}
 
 			std::vector<double> delta_write;
