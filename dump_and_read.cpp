@@ -16,9 +16,20 @@ namespace po = boost::program_options;
 #include <vector>
 #include <iterator>
 #include <numeric>
+#include <unistd.h>
 
 using namespace std;
 int main ( int argc, char *argv[] );
+
+int GetFileDescriptor(std::filebuf& filebuf)
+{
+  class my_filebuf : public std::filebuf
+  {
+  public:
+    int handle() { return _M_file.fd(); }
+  };
+  return static_cast<my_filebuf&>(filebuf).handle();
+}
 
 // A helper function to simplify the main part.
 template<class T>
@@ -105,13 +116,14 @@ int main ( int argc, char *argv[] ){
 			std::cout << "ERROR SIZE!! Please choose size < 1000000 MB"<< std::endl;
 		}
 		else{
-			cout << "readFromFile = "<<readFromFile<<"\n";
+//			cout << "readFromFile = "<<readFromFile<<"\n";
 			byte = mb * 1000000;
 			size_byte = (int)std::ceil(byte);
 		
 			int i;
 			
-			//for each process, create a vector (size = tot iterations) that it will contain delta write times of each iteration.
+			/*for each process, create a vector (size = tot iterations)
+			  that it will contain delta write/read times of each iteration.*/
 			std::vector<double> delta_wp(its);
 			std::vector<double> delta_rp;
 			if(readFromFile){
@@ -151,9 +163,14 @@ int main ( int argc, char *argv[] ){
 					outfile.open(outputFile, ios::binary|ios::out);
 					
 					copy(buffer.begin(), buffer.end(), std::ostreambuf_iterator<char>(outfile));	
+					
+					/* try to force file's buffers out to the disk
+					   ( reference: http://stackoverflow.com/questions/676787/how-to-do-fsync-on-an-ofstream ) */
+					outfile.flush();
+					fsync(GetFileDescriptor(*outfile.rdbuf()));
 
 					outfile.close();
-					
+						
 					delta_wp[i] = MPI_Wtime ( ) - start_write;
 					cout << "I wrote " << mb << " MB to file " << outputFile << " in "<< delta_wp[i] <<" seconds.\n";
 				}
@@ -178,6 +195,7 @@ int main ( int argc, char *argv[] ){
 			//	if(id == 0){cout<<"disposition["<<k<<"] = "<<disposition[k]<<" -- count["<<k<<"] = "<<count[k]<<"\n";}
 			}
 	
+			//gather all partial vectors down to the root process(id = 0 in this case).
 			MPI_Gatherv(&delta_wp.front(), its, MPI_DOUBLE, &delta_write.front(),
 								count, disposition, MPI_DOUBLE, 0,MPI_COMM_WORLD);
 			if(readFromFile){
@@ -188,10 +206,10 @@ int main ( int argc, char *argv[] ){
 			if(id == 0){
 				double average_write = std::accumulate(delta_write.begin(), delta_write.end(), 0.0)/delta_write.size();
 				
-				cout << "\n------------------------\nAverage write time: "<<average_write<<" seconds.\n";
+				cout << "\n------------------------\nAverage write time of all processes: "<<average_write<<" seconds.\n";
 				if(readFromFile){
 					double average_read = std::accumulate(delta_read.begin(), delta_read.end(), 0.0)/(its*p-p);
-					cout << "Average read time: "<<average_read<<" seconds.\n";
+					cout << "Average read time of all processes: "<<average_read<<" seconds.\n";
 				}
 				cout << "------------------------\n\n";
 			
