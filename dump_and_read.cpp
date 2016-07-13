@@ -17,6 +17,8 @@ namespace po = boost::program_options;
 #include <iterator>
 #include <numeric>
 #include <unistd.h>
+#include <cstdio>
+
 
 using namespace std;
 int main ( int argc, char *argv[] );
@@ -54,6 +56,7 @@ int main ( int argc, char *argv[] ){
         int p;
         double wtime;
 	bool readFromFile;
+	bool eraseFiles;
 
 	//  Initialize MPI.
         ierr = MPI_Init ( &argc, &argv );
@@ -75,6 +78,7 @@ int main ( int argc, char *argv[] ){
 	    		("seconds",	po::value<float>(&sec)->default_value(60),	"seconds to wait between two iterations")
 	    		("iterations",	po::value<int>(&its)->default_value(1),		"iterations of process")
 			("readFromFile",po::value<bool>(&readFromFile),			"enable to read from files (on/off, true/false, 1/0)")
+			("erase, e",	po::value<bool>(&eraseFiles),			"enable deleting files (on/off, true/false, 1/0)")
         	;
 
         	po::positional_options_description p;
@@ -83,15 +87,16 @@ int main ( int argc, char *argv[] ){
 		p.add("seconds", 1);
 		p.add("iterations", 1);
 		p.add("readFromFile",1);
+		p.add("erase",1);
 
         	po::variables_map vm;
         	po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 		
         	if (vm.count("help")) {
 			if(id == 0){
-            			cout << "\nUsage: mpirun -np <n_process> ./a.out [--size ARG]* [--seconds ARG] [--iterations ARG] [--readFromFile ARG]\n";
+            			cout << "\nUsage: mpirun -np <n_process> ./a.out [--size ARG]* [--seconds ARG] [--iterations ARG] [--readFromFile ARG] [-e(--erase) ARG]\n";
 				cout << "   ...or...\n";
-				cout << "       mpirun -np <n_process> ./a.out n_mb* n_seconds n_iterations readFromFile\n";
+				cout << "       mpirun -np <n_process> ./a.out n_mb* n_seconds n_iterations readFromFile eraseFiles\n";
 	    			cout << "* Required Argument\n\n";
             			cout << desc << "\n";
 			}
@@ -218,11 +223,23 @@ int main ( int argc, char *argv[] ){
 					cout << "Average read time of all processes: "<<average_read<<" seconds.\n";
 				}
 				cout << "------------------------\n\n";
-			
-			/*	for(int j=0; j<delta_read.size();j++){
-					cout << "delta_read["<<j<<"] = "<<delta_read[j] <<"\n";
-				}*/
 			}
+
+			//delete output files and make a list with their names.
+                        if(eraseFiles){
+				if(id == 0){
+					cout << "I'm going to delete all files...\n";
+				}
+                                for(int jj=0; jj<its; jj++){
+                                        std::string item = "outFile_it" + std::to_string(jj) + "_p" + std::to_string(id) + ".txt";
+                                        std::string pathItem = "/root/Checkpointing-and-Restart-CppMPI/" + item;
+					
+                                        if( remove(pathItem.c_str()) != 0 ){
+                                                perror( "Error deleting file" );
+                                        }
+                                }
+				if(id == 0){cout << "Done. I deleted all the files. Bye Bye!\n\n"}
+                        }
 		}
 	}
 	//  Terminate MPI
