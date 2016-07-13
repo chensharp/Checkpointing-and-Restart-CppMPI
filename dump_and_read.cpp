@@ -113,7 +113,10 @@ int main ( int argc, char *argv[] ){
 			
 			//for each process, create a vector (size = tot iterations) that it will contain delta write times of each iteration.
 			std::vector<double> delta_wp(its);
-		//	std::vector<double> vector_start(size_byte);			
+			std::vector<double> delta_rp;
+			if(readFromFile){
+				delta_rp.assign(its, 0.);
+			}
 
 			for(i = 0; i < its; i++){
 				if(id == 0){
@@ -126,10 +129,14 @@ int main ( int argc, char *argv[] ){
 					std::vector<char> buffer(size_byte);
 					
 					if(readFromFile && i>0){
+						double start_read = 0.;
+
 						std::string inputFile = "outFile_it" + std::to_string(i-1) + "_p" + std::to_string(id)+".txt";
+						start_read = MPI_Wtime ( );
 						ifstream infile(inputFile, std::ios::binary);
 						buffer.assign((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-						cout << "I read " << mb << " MB from file " << inputFile << "\n";
+						delta_rp[i] = MPI_Wtime ( ) - start_read;
+						cout << "I read " << mb << " MB from file " << inputFile << " in "<< delta_rp[i] <<" seconds.\n";
 					}
 
 					//synchronization: no process can pass the barrier until all of them call the function.
@@ -154,9 +161,13 @@ int main ( int argc, char *argv[] ){
 			}
 
 			std::vector<double> delta_write;
+			std::vector<double> delta_read;
 			if(id == 0){
 				//create the main vectors that contain all delta times of all processes.
 				delta_write.assign(its*p, 0.);
+				if(readFromFile){
+					delta_read.assign(its*p, 0.);
+				}
 			}
 
 			int disposition[p];
@@ -169,13 +180,23 @@ int main ( int argc, char *argv[] ){
 	
 			MPI_Gatherv(&delta_wp.front(), its, MPI_DOUBLE, &delta_write.front(),
 								count, disposition, MPI_DOUBLE, 0,MPI_COMM_WORLD);
+			if(readFromFile){
+				MPI_Gatherv(&delta_rp.front(), its, MPI_DOUBLE, &delta_read.front(),
+                                                                count, disposition, MPI_DOUBLE, 0,MPI_COMM_WORLD);
+			}
 			
 			if(id == 0){
 				double average_write = std::accumulate(delta_write.begin(), delta_write.end(), 0.0)/delta_write.size();
-				cout << "\n------------------------\nAverage write time: "<<average_write<<" seconds.\n\n";
+				
+				cout << "\n------------------------\nAverage write time: "<<average_write<<" seconds.\n";
+				if(readFromFile){
+					double average_read = std::accumulate(delta_read.begin(), delta_read.end(), 0.0)/(its*p-p);
+					cout << "Average read time: "<<average_read<<" seconds.\n";
+				}
+				cout << "------------------------\n\n";
 			
-			/*	for(int j=0; j<delta_write.size();j++){
-					cout << "delta_write["<<j<<"] = "<<delta_write[j] <<"\n";
+			/*	for(int j=0; j<delta_read.size();j++){
+					cout << "delta_read["<<j<<"] = "<<delta_read[j] <<"\n";
 				}*/
 			}
 		}
